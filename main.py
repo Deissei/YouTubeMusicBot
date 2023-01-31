@@ -24,6 +24,10 @@ def send_video_user(message):
         audio = open(f'music/{yt.title}.mp3', 'rb')
         bot.send_audio(message.chat.id, audio, caption=f'<b>{yt.title}\n@Deyssey</b>', parse_mode='html')
 
+        with open('Cash.txt', 'a', encoding='utf-8') as file:
+            file.write(f'--{message.from_user.username}--{message.from_user.first_name}--{yt.title}--\n')
+        print(file)
+
         bot.delete_message(message.chat.id, message.message_id)
         bot.delete_message(chat_id=message.chat.id, message_id=start_msg.message_id)
         bot.delete_message(chat_id=message.chat.id, message_id=send_audio_msg.message_id)
