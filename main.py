@@ -1,49 +1,38 @@
-from config import TOKEN, LINK_YOUTUBE, FULL_LINK_YOUTUBE
-from aiogram import *
-from pytube import YouTube
-from visualizator import *
 import os
+import telebot
+from pytube import YouTube
+from config import *
+from visualizator import *
 
 
-bot = Bot(TOKEN)
-dp = Dispatcher(bot)
+bot = telebot.TeleBot(TOKEN)
 
 
-@dp.message_handler(commands=["start"])
-async def start_bot(message: types.Message):
-    chat_id = message.chat.id
-    await bot.send_message(chat_id, text=f"{WELCOME} {message.from_user.first_name}!")
-    await bot.send_message(chat_id, text=SEND_LINK)
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.send_message(message.chat.id, f'{WELCOME} {message.from_user.first_name}\n{SEND_LINK}')
 
-@dp.message_handler(commands=["help"])
-async def help_bot(message: types.Message):
-    chat_id = message.chat.id
-    await bot.send_message(chat_id, text=HELP_BOT)
+@bot.message_handler()
+def send_video_user(message):
+    if message.text[:23] in FULL_LINK_YOUTUBE or message.text[:16] in LINK_YOUTUBE:
+        start_msg = bot.send_message(chat_id=message.chat.id, text=START_DOWNLOAD)
+        yt = YouTube(url=message.text)
+        video = yt.streams.filter(only_audio=True).first()
+        video.download(output_path='music', filename=f'{yt.title}.mp3')
 
+        send_audio_msg = bot.send_message(message.chat.id, SEND_AUDIO)
+        audio = open(f'music/{yt.title}.mp3', 'rb')
+        bot.send_audio(message.chat.id, audio, caption=f'<b>{yt.title}\n@Deyssey</b>', parse_mode='html')
 
-@dp.message_handler()
-async def text_message(message: types.Message):
-    chat_id = message.chat.id
-    url = message.text
+        bot.delete_message(message.chat.id, message.message_id)
+        bot.delete_message(chat_id=message.chat.id, message_id=start_msg.message_id)
+        bot.delete_message(chat_id=message.chat.id, message_id=send_audio_msg.message_id)
 
-    if url[0:16] in FULL_LINK_YOUTUBE or url[0:16] in LINK_YOUTUBE:
-        await bot.send_message(chat_id, text=START_DOWNLOAD)
-        await downloads(url, message, bot)
-        await bot.delete_message(chat_id, message_id=message.message_id)
+        path = f'music/{yt.title}.mp3'
+        os.remove(path=path)
     else:
-        await bot.send_message(chat_id, text=SEND_LINK_PLEASE)
-        await bot.delete_message(chat_id, message_id=message.message_id)
-
-        
-async def downloads(url, message, bot):
-    yt = YouTube(url)
-    stream = yt.streams.filter(progressive=True, file_extension='mp4')
-    stream.get_highest_resolution().download(f'{message.chat.id}', f"{yt.title}")
-
-    with open(f"{message.chat.id}/{yt.title}", 'rb') as video:
-        await bot.send_audio(message.chat.id, video, caption='@Deyssey')
-        os.remove(f"{message.chat.id}/{yt.title}")
-
+        bot.send_message(chat_id=message.chat.id, text=SEND_LINK_PLEASE)
 
 if __name__ == '__main__':
-    executor.start_polling(dp)
+    print('[INFO]:Telegram Bot connection!')
+    bot.polling(none_stop=True)
